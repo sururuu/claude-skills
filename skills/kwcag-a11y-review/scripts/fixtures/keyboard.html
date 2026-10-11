@@ -1,0 +1,34 @@
+<!doctype html>
+<!-- --keyboard 회귀 테스트용. 각 요소에 일부러 넣은 문제와 기대 결과를 주석으로 적는다. -->
+<html lang="ko">
+<head>
+	<title>키보드 테스트</title>
+	<style>
+		.no-ring:focus { outline: none; }
+	</style>
+</head>
+<body>
+	<main>
+		<!-- 정상: 기본 초점 표시 -->
+		<button>정상 버튼</button>
+		<!-- 2.1.2 검토 필요(kwcag-focus-indicator): 초점 표시를 지움 -->
+		<button class="no-ring">초점 표시 없음</button>
+		<!-- 2.1.1 검토 필요(kwcag-pointer-only): 클릭 커서지만 초점을 못 받음 -->
+		<div style="cursor: pointer" onclick="void 0">div 클릭</div>
+		<!-- 2.1.2 위반(kwcag-focus-hidden): 투명하지만 초점을 받음 -->
+		<button style="opacity: 0">투명 버튼</button>
+		<!-- 2.1.1 위반(kwcag-focus-trap): 함정2에서 Tab을 누르면 함정1로 되돌아감 -->
+		<button id="t1">함정1</button>
+		<button id="t2">함정2</button>
+		<button>도달 불가</button>
+	</main>
+	<script>
+		document.getElementById('t2').addEventListener('keydown', (e) => {
+			if (e.key === 'Tab' && !e.shiftKey) {
+				e.preventDefault()
+				document.getElementById('t1').focus()
+			}
+		})
+	</script>
+</body>
+</html>

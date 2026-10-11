@@ -68,13 +68,18 @@ React·Next.js·Tailwind에서 자주 놓치는 것:
 
 - 렌더링된 페이지 (권장): 개발 서버가 떠 있고 `playwright`, `@axe-core/playwright`가 설치돼 있을 때
   ```bash
-  node <skill-dir>/scripts/kwcag-scan.mjs --url http://localhost:3000 --url http://localhost:3000/login --out a11y-scan.md
+  node <skill-dir>/scripts/kwcag-scan.mjs --url http://localhost:3000 --url http://localhost:3000/login --keyboard --out a11y-scan.md
   ```
 - 정적 HTML: 빌드 결과물이나 마크업 파일만 있을 때 (`jsdom`, `axe-core` 필요)
   ```bash
   node <skill-dir>/scripts/kwcag-scan.mjs --file out/index.html --out a11y-scan.md
   ```
 - `--experimental`을 붙이면 2.5.3(`label-content-name-mismatch`) 같은 실험 규칙도 돈다. `--json`으로 원자료도 저장할 수 있다.
+- `--keyboard`(URL 모드 전용)를 붙이면 실제로 Tab을 눌러 키보드 확인을 한다. 렌더링 스캔에는 기본으로 붙인다.
+  - 2.1.2 위반: 보이지 않는 요소가 초점을 받음 / 검토 필요: 초점 전후 겉모양이 같음
+  - 2.1.1 위반: 초점이 일부 요소 사이에서만 돎(키보드 함정) / 검토 필요: `cursor: pointer`인데 초점을 못 받는 요소(`<div onClick>` 후보)
+  - 보고서에 "키보드 초점 순서" 목록이 붙는다. 화면 순서와 맞는지는 사람이 판단하므로 1.3.2·2.1.2 수동 확인 항목으로 옮긴다.
+  - 한계: Tab 순회만 본다. 모달 열기·Esc 닫기·초점 복귀처럼 조작이 필요한 흐름, Enter/Space 동작, 화면 순서와의 일치는 확인하지 않는다. 초점 표시 판정은 요소 자체의 스타일만 비교하므로 부모나 가상 요소로 표시하는 경우는 "표시 없음"으로 잘못 나올 수 있다.
 
 알려진 한계 (보고서에 반영할 것):
 - 정적 모드(jsdom)는 레이아웃을 계산하지 못해 명도 대비(1.4.3), 일부 랜드마크·제목 규칙을 판정하지 못한다. 스크립트가 "계산하지 못한 규칙"으로 따로 알려 준다.
@@ -87,7 +92,7 @@ React·Next.js·Tailwind에서 자주 놓치는 것:
 
 ### 5. 수동 확인 목록 만들기
 
-자동·AI로 판정할 수 없는 항목은 대상 화면에 맞춘 구체적인 확인 절차로 바꿔 적는다. 일반론이 아니라 "이 화면에서 무엇을 어떻게 할지"를 쓴다.
+자동·AI로 판정할 수 없는 항목은 대상 화면에 맞춘 구체적인 확인 절차로 바꿔 적는다. 일반론이 아니라 "이 화면에서 무엇을 어떻게 할지"를 쓴다. `--keyboard`로 이미 확인한 것(Tab 순회, 숨은 요소 초점, 키보드 함정)은 다시 시키지 말고, 남은 조작 흐름(모달 열고 닫기, 초점 복귀, Enter/Space 동작)과 초점 순서 목록 검토만 남긴다.
 
 예:
 - 2.1.1 / 2.1.2: 마우스 없이 Tab·Shift+Tab만으로 헤더 → 필터 → 목록 → 상세 이동, 초점 표시가 항상 보이는지, 모달을 열고 Esc로 닫았을 때 초점이 열기 버튼으로 돌아오는지

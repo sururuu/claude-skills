@@ -276,6 +276,18 @@
     },
     "kwcag-duplicate-id": {
       "item": "4.1.1"
+    },
+    "kwcag-focus-hidden": {
+      "item": "2.1.2"
+    },
+    "kwcag-focus-indicator": {
+      "item": "2.1.2"
+    },
+    "kwcag-focus-trap": {
+      "item": "2.1.1"
+    },
+    "kwcag-pointer-only": {
+      "item": "2.1.1"
     }
   }
 }

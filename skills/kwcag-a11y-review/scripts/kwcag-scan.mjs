@@ -22,7 +22,7 @@ const MAP = JSON.parse(fs.readFileSync(path.join(here, 'kwcag-map.json'), 'utf8'
 const projectRequire = createRequire(path.join(process.cwd(), 'noop.js'));
 
 function parseArgs(argv) {
-  const args = { urls: [], files: [], out: null, json: null, experimental: false, wait: 0 };
+  const args = { urls: [], files: [], out: null, json: null, experimental: false, wait: 0, keyboard: false, tabs: 100 };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--url') args.urls.push(argv[++i]);
@@ -31,8 +31,14 @@ function parseArgs(argv) {
     else if (a === '--json') args.json = argv[++i];
     else if (a === '--experimental') args.experimental = true;
     else if (a === '--wait') args.wait = Number(argv[++i]) || 0;
-    else if (a === '-h' || a === '--help') { args.help = true; }
-    else { console.error(`알 수 없는 인자: ${a}`); process.exit(2); }
+    else if (a === '--keyboard') args.keyboard = true;
+    else if (a === '--tabs') args.tabs = Number(argv[++i]) || 100;
+    else if (a === '-h' || a === '--help') {
+      args.help = true;
+    } else {
+      console.error(`알 수 없는 인자: ${a}`);
+      process.exit(2);
+    }
   }
   return args;
 }
@@ -95,6 +101,117 @@ function dupIdViolation(dups) {
   };
 }
 
+// ── 키보드 확인 (--keyboard, URL 모드 전용) ──
+// 실제로 Tab을 눌러 초점 순서를 기록하고, 아래를 찾는다.
+//   2.1.2 위반: 보이지 않는 요소가 초점을 받음 / 검토 필요: 초점을 받아도 스타일이 그대로임
+//   2.1.1 위반: 초점이 일부 요소 사이에서만 돎(키보드 함정) / 검토 필요: 포인터 커서인데 키보드로 갈 수 없음
+// 개발 도구 오버레이(Next.js 표시, TanStack Query devtools)는 기록하지 않는다.
+const FOCUS_IGNORE = 'nextjs-portal, [data-nextjs-toast], .tsqd-parent-container, [data-kwcag-ignore]';
+
+const FOCUS_INFO_FN = `((ignore) => {
+  const el = document.activeElement;
+  if (!el || el === document.body || el === document.documentElement) return null;
+  if (el.closest(ignore)) return { ignored: true };
+  el.dataset.kwcagFocus ??= String(Object.keys(window.__kwcagIds ??= {}).length);
+  window.__kwcagIds[el.dataset.kwcagFocus] = true;
+  const r = el.getBoundingClientRect();
+  const s = getComputedStyle(el);
+  const look = () => { const c = getComputedStyle(el); return [c.outlineStyle, c.outlineWidth, c.outlineColor, c.boxShadow, c.borderColor, c.backgroundColor, c.color, c.textDecorationLine].join('|'); };
+  const focused = look();
+  el.blur();
+  const unfocused = look();
+  el.focus();
+  const name = (el.getAttribute('aria-label') || el.innerText || el.querySelector('img')?.alt || el.getAttribute('title') || '').replace(/\\s+/g, ' ').trim().slice(0, 60);
+  const role = el.getAttribute('role') || el.tagName.toLowerCase();
+  return {
+    key: el.dataset.kwcagFocus,
+    role,
+    name,
+    html: el.outerHTML.slice(0, 200),
+    hidden: (r.width === 0 && r.height === 0) || s.visibility === 'hidden' || Number(s.opacity) === 0 || !!el.closest('[aria-hidden="true"]'),
+    noIndicator: focused === unfocused,
+  };
+})`;
+
+const POINTER_ONLY_FN = `((ignore) => {
+  const FOCUSABLE = 'a[href], button, input, select, textarea, summary, label, [tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
+  const hits = [...document.body.querySelectorAll('*')].filter((el) => {
+    if (el.closest(ignore) || el.closest(FOCUSABLE) || el.querySelector(FOCUSABLE)) return false;
+    if (getComputedStyle(el).cursor !== 'pointer') return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  });
+  // cursor는 상속되므로 가장 바깥 요소만 남긴다
+  return hits.filter((el) => !hits.includes(el.parentElement)).slice(0, 20).map((el) => el.outerHTML.slice(0, 200));
+})`;
+
+function pseudoRule(id, help, nodes) {
+  return { id, impact: 'serious', help, helpUrl: '', nodes: nodes.map(({ target, html, summary }) => ({ target: [target], html, failureSummary: `Fix:\n${summary}` })) };
+}
+
+async function keyboardPass(page, maxTabs) {
+  await page.evaluate(() => {
+    document.activeElement?.blur();
+    window.scrollTo(0, 0);
+  });
+  const order = [];
+  let trap = null;
+  for (let i = 0; i < maxTabs; i++) {
+    await page.keyboard.press('Tab');
+    const info = await page.evaluate(`${FOCUS_INFO_FN}(${JSON.stringify(FOCUS_IGNORE)})`);
+    if (!info) break; // 문서 밖으로 나감 = 끝까지 돎
+    if (info.ignored) continue;
+    if (order.length && info.key === order[0].key) break; // 처음으로 돌아옴 = 끝까지 돎
+    const seenAt = order.findIndex((o) => o.key === info.key);
+    if (seenAt > 0) {
+      trap = order.slice(seenAt);
+      break;
+    } // 처음이 아닌 곳으로 되돌아옴 = 함정
+    order.push(info);
+  }
+  const reachedLimit = !trap && order.length >= maxTabs;
+  const pointerOnly = await page.evaluate(`${POINTER_ONLY_FN}(${JSON.stringify(FOCUS_IGNORE)})`);
+  const label = (o) => `${o.role} "${o.name}"`;
+
+  const violations = [];
+  const incomplete = [];
+  const hidden = order.filter((o) => o.hidden);
+  if (hidden.length)
+    violations.push(
+      pseudoRule(
+        'kwcag-focus-hidden',
+        '보이지 않는 요소가 키보드 초점을 받습니다',
+        hidden.map((o) => ({ target: label(o), html: o.html, summary: '화면에 보이지 않는데 Tab으로 초점이 이동함 — 숨길 때 inert·tabIndex={-1}·display:none 사용' })),
+      ),
+    );
+  if (trap)
+    violations.push(
+      pseudoRule(
+        'kwcag-focus-trap',
+        '키보드 초점이 일부 요소 안에서만 돕니다 (키보드 함정 의심)',
+        trap.map((o) => ({ target: label(o), html: o.html, summary: `Tab을 계속 눌러도 이 ${trap.length}개 요소 밖으로 나가지 못함 — 모달이라면 닫기(Esc) 수단이 있는지 확인` })),
+      ),
+    );
+  const noRing = order.filter((o) => !o.hidden && o.noIndicator);
+  if (noRing.length)
+    incomplete.push(
+      pseudoRule(
+        'kwcag-focus-indicator',
+        '초점을 받아도 겉모양이 바뀌지 않습니다',
+        noRing.map((o) => ({ target: label(o), html: o.html, summary: '초점 전후 outline·box-shadow·테두리·배경·글자색이 같음 — 초점 표시가 보이는지 화면에서 확인' })),
+      ),
+    );
+  if (pointerOnly.length)
+    incomplete.push(
+      pseudoRule(
+        'kwcag-pointer-only',
+        '포인터 커서가 있지만 키보드로 초점을 받을 수 없습니다',
+        pointerOnly.map((html) => ({ target: '(포인터 전용 요소)', html, summary: 'cursor:pointer인데 초점을 받을 수 없음 — 클릭 동작이 있다면 button·a로 바꾸기' })),
+      ),
+    );
+  return { order, trap: !!trap, reachedLimit, violations, incomplete };
+}
+
 function experimentalRules(enabled) {
   if (!enabled) return {};
   return { 'label-content-name-mismatch': { enabled: true }, 'focus-order-semantics': { enabled: true } };
@@ -103,7 +220,7 @@ function experimentalRules(enabled) {
 async function scanUrls(urls, opts) {
   const { add, exec } = pm();
   // playwright·jsdom은 CommonJS라 import() 시 이름 있는 export가 안 잡힐 수 있어 default로도 꺼낸다.
-  const pw = await importFromProject('playwright',`${add} playwright @axe-core/playwright && ${exec} playwright install chromium`);
+  const pw = await importFromProject('playwright', `${add} playwright @axe-core/playwright && ${exec} playwright install chromium`);
   const { chromium } = pw.chromium ? pw : pw.default;
   const axeMod = await importFromProject('@axe-core/playwright', `${add} @axe-core/playwright`);
   const AxeBuilder = axeMod.default?.default ?? axeMod.default ?? axeMod.AxeBuilder;
@@ -128,11 +245,16 @@ async function scanUrls(urls, opts) {
       try {
         await page.goto(url, { waitUntil: 'networkidle' });
         if (opts.wait) await page.waitForTimeout(opts.wait);
-        const r = await new AxeBuilder({ page, axeSource })
-          .options({ rules: experimentalRules(opts.experimental) })
-          .analyze();
+        const r = await new AxeBuilder({ page, axeSource }).options({ rules: experimentalRules(opts.experimental) }).analyze();
         addDupIds(r, await page.evaluate(DUP_ID_FN));
-        results.push({ target: url, mode: 'url', raw: r });
+        // 키보드 확인은 axe 다음에 돌린다 — Tab 이동·blur/focus가 axe 결과에 영향을 주지 않게
+        let keyboard;
+        if (opts.keyboard) {
+          keyboard = await keyboardPass(page, opts.tabs);
+          r.violations.push(...keyboard.violations);
+          r.incomplete.push(...keyboard.incomplete);
+        }
+        results.push({ target: url, mode: 'url', raw: r, keyboard });
       } catch (e) {
         console.error(`[kwcag-scan] ${url} 검사 실패: ${e.message.split('\n')[0]}`);
         results.push({ target: url, mode: 'url', error: e.message.split('\n')[0] });
@@ -184,9 +306,7 @@ function trim(s, n = 160) {
 const ENGINE_ERROR = /Axe encountered an error/i;
 
 function engineErrors(raw) {
-  return raw.incomplete
-    .filter((r) => r.nodes.length && r.nodes.every((n) => ENGINE_ERROR.test(n.failureSummary || '')))
-    .map((r) => r.id);
+  return raw.incomplete.filter((r) => r.nodes.length && r.nodes.every((n) => ENGINE_ERROR.test(n.failureSummary || ''))).map((r) => r.id);
 }
 
 function group(raw) {
@@ -216,7 +336,8 @@ function group(raw) {
 function sortItems(keys) {
   const num = (k) => (k === '미분류' ? [9, 9, 9] : k.split('.').map(Number));
   return keys.sort((a, b) => {
-    const x = num(a), y = num(b);
+    const x = num(a),
+      y = num(b);
     for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] - y[i];
     return 0;
   });
@@ -229,7 +350,11 @@ function itemName(k) {
 
 function render(results, opts) {
   const lines = [];
-  const autoCovered = new Set(Object.values(MAP.rules).filter((r) => !r.ref).map((r) => r.item));
+  const autoCovered = new Set(
+    Object.values(MAP.rules)
+      .filter((r) => !r.ref)
+      .map((r) => r.item),
+  );
   autoCovered.add('4.2.1');
   const uncovered = Object.keys(MAP.items).filter((k) => !autoCovered.has(k));
 
@@ -267,36 +392,9 @@ function render(results, opts) {
     if (keys.length === 0) {
       lines.push('자동 규칙에서 위반이나 검토 필요 항목이 발견되지 않았습니다.');
       lines.push('');
-      continue;
     }
-    lines.push('| 항목 | 이름 | 위반 요소 | 검토 필요 요소 | 관련 규칙(참고) |');
-    lines.push('|---|---|---|---|---|');
-    for (const k of keys) {
-      const cnt = (list, ref) => list.filter((r) => r.ref === ref).reduce((t, r) => t + r.nodes.length, 0);
-      const v = cnt(byItem[k].violations, false);
-      const i = cnt(byItem[k].incomplete, false);
-      const ref = cnt(byItem[k].violations, true) + cnt(byItem[k].incomplete, true);
-      lines.push(`| ${k} | ${itemName(k)} | ${v} | ${i} | ${ref} |`);
-    }
-    lines.push('');
-
-    for (const k of keys) {
-      const g = byItem[k];
-      lines.push(`### ${k} ${itemName(k)}`);
-      lines.push('');
-      for (const [label, list] of [['위반', g.violations], ['검토 필요', g.incomplete]]) {
-        for (const r of list) {
-          lines.push(`- **[${label}] ${r.rule}**${r.ref ? ' (관련 규칙, 직접 대응 아님)' : ''} — ${r.help} (${r.impact ?? 'n/a'})`);
-          const limit = r.ref ? 3 : 10;
-          for (const n of r.nodes.slice(0, limit)) {
-            lines.push(`  - \`${n.target}\` — \`${n.html.replace(/`/g, "'")}\``);
-            if (n.summary) lines.push(`    - ${n.summary}`);
-          }
-          if (r.nodes.length > limit) lines.push(`  - …외 ${r.nodes.length - limit}개`);
-        }
-      }
-      lines.push('');
-    }
+    if (keys.length) renderItems(lines, byItem, keys);
+    if (res.keyboard) renderFocusOrder(lines, res.keyboard);
   }
 
   lines.push('## 자동 스캔으로 판정하지 않는 항목');
@@ -308,16 +406,60 @@ function render(results, opts) {
   return lines.join('\n');
 }
 
+function renderFocusOrder(lines, kb) {
+  const end = kb.trap ? '키보드 함정 의심으로 중단' : kb.reachedLimit ? 'Tab 횟수 한도에 도달 (--tabs로 늘리기)' : '끝까지 순회';
+  lines.push(`### 키보드 초점 순서 (${kb.order.length}개 · ${end})`);
+  lines.push('');
+  lines.push('화면에 보이는 순서와 맞는지 사람이 확인하세요 (1.3.2, 2.1.2). ⚠ 숨김 = 보이지 않는 요소, ○ 표시 없음 = 초점 전후 모양이 같음.');
+  lines.push('');
+  kb.order.forEach((o, i) => {
+    const flags = [o.hidden && '⚠ 숨김', !o.hidden && o.noIndicator && '○ 표시 없음'].filter(Boolean).join(' ');
+    lines.push(`${i + 1}. ${o.role} "${o.name || '(이름 없음)'}"${flags ? ` — ${flags}` : ''}`);
+  });
+  lines.push('');
+}
+
+function renderItems(lines, byItem, keys) {
+  lines.push('| 항목 | 이름 | 위반 요소 | 검토 필요 요소 | 관련 규칙(참고) |');
+  lines.push('|---|---|---|---|---|');
+  for (const k of keys) {
+    const cnt = (list, ref) => list.filter((r) => r.ref === ref).reduce((t, r) => t + r.nodes.length, 0);
+    const v = cnt(byItem[k].violations, false);
+    const i = cnt(byItem[k].incomplete, false);
+    const ref = cnt(byItem[k].violations, true) + cnt(byItem[k].incomplete, true);
+    lines.push(`| ${k} | ${itemName(k)} | ${v} | ${i} | ${ref} |`);
+  }
+  lines.push('');
+
+  for (const k of keys) {
+    const g = byItem[k];
+    lines.push(`### ${k} ${itemName(k)}`);
+    lines.push('');
+    for (const [label, list] of [
+      ['위반', g.violations],
+      ['검토 필요', g.incomplete],
+    ]) {
+      for (const r of list) {
+        lines.push(`- **[${label}] ${r.rule}**${r.ref ? ' (관련 규칙, 직접 대응 아님)' : ''} — ${r.help} (${r.impact ?? 'n/a'})`);
+        const limit = r.ref ? 3 : 10;
+        for (const n of r.nodes.slice(0, limit)) {
+          lines.push(`  - \`${n.target}\` — \`${n.html.replace(/`/g, "'")}\``);
+          if (n.summary) lines.push(`    - ${n.summary}`);
+        }
+        if (r.nodes.length > limit) lines.push(`  - …외 ${r.nodes.length - limit}개`);
+      }
+    }
+    lines.push('');
+  }
+}
+
 const args = parseArgs(process.argv.slice(2));
 if (args.help || (args.urls.length === 0 && args.files.length === 0)) {
-  console.log('사용법: node kwcag-scan.mjs (--url <url> | --file <html>)... [--out report.md] [--json report.json] [--experimental] [--wait ms]');
+  console.log('사용법: node kwcag-scan.mjs (--url <url> | --file <html>)... [--out report.md] [--json report.json] [--experimental] [--wait ms] [--keyboard [--tabs n]]');
   process.exit(args.help ? 0 : 1);
 }
 
-const results = [
-  ...(args.urls.length ? await scanUrls(args.urls, args) : []),
-  ...(args.files.length ? await scanFiles(args.files, args) : []),
-];
+const results = [...(args.urls.length ? await scanUrls(args.urls, args) : []), ...(args.files.length ? await scanFiles(args.files, args) : [])];
 
 const md = render(results, args);
 if (args.out) fs.writeFileSync(args.out, md);

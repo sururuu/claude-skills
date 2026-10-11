@@ -35,8 +35,10 @@ npx skills add sururuu/claude-skills --skill kwcag-a11y-review -g
 | `--file` | 정적 HTML | `jsdom`, `axe-core` |
 
 ```bash
-node <skill-dir>/scripts/kwcag-scan.mjs --url http://localhost:3000/products/1 --out a11y-scan.md
+node <skill-dir>/scripts/kwcag-scan.mjs --url http://localhost:3000/products/1 --keyboard --out a11y-scan.md
 ```
+
+`--keyboard`를 붙이면 실제로 Tab을 눌러 키보드 초점 순서를 기록하고, 보이지 않는 요소의 초점·초점 표시 없음·키보드 함정·포인터 전용 요소를 찾습니다(KWCAG 2.1.1, 2.1.2).
 
 로컬 개발 서버의 자체 서명 HTTPS 인증서는 무시하고 검사합니다.
 
@@ -49,7 +51,7 @@ npm install
 npm test
 ```
 
-`scripts/fixtures/violations.html`에 심어 둔 위반이 기대한 KWCAG 항목으로 묶이는지 확인합니다.
+`scripts/fixtures/`에 심어 둔 위반이 기대한 KWCAG 항목으로 묶이는지 확인합니다. 키보드 확인 테스트는 Chromium이 필요합니다(`npx playwright install chromium`).
 
 #### 주의
 
