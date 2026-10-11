@@ -38,7 +38,7 @@ npx skills add sururuu/claude-skills --skill kwcag-a11y-review -g
 node <skill-dir>/scripts/kwcag-scan.mjs --url http://localhost:3000/products/1 --keyboard --out a11y-scan.md
 ```
 
-`--keyboard`를 붙이면 실제로 Tab을 눌러 키보드 초점 순서를 기록하고, 보이지 않는 요소의 초점·초점 표시 없음·키보드 함정·포인터 전용 요소를 찾습니다(KWCAG 2.1.1, 2.1.2).
+`--keyboard`를 붙이면 실제로 Tab을 눌러 키보드 초점 순서를 기록하고, 보이지 않는 요소의 초점·초점 표시 없음·고정 요소에 가려진 초점·키보드 함정·포인터 전용 요소를 찾습니다(KWCAG 2.1.1, 2.1.2). 상태 속성(`aria-expanded` 등)이 있는 컨트롤은 Enter로 눌러 상태가 바뀌는지, 초점을 잃지 않는지도 확인합니다(2.1.2, 4.2.1).
 
 로컬 개발 서버의 자체 서명 HTTPS 인증서는 무시하고 검사합니다.
 

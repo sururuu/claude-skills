@@ -123,13 +123,21 @@ const FOCUS_INFO_FN = `((ignore) => {
   el.focus();
   const name = (el.getAttribute('aria-label') || el.innerText || el.querySelector('img')?.alt || el.getAttribute('title') || '').replace(/\\s+/g, ' ').trim().slice(0, 60);
   const role = el.getAttribute('role') || el.tagName.toLowerCase();
+  const hidden = (r.width === 0 && r.height === 0) || s.visibility === 'hidden' || Number(s.opacity) === 0 || !!el.closest('[aria-hidden="true"]');
+  // 가림: 요소의 가운데와 네 귀퉁이가 모두 다른 요소(고정 헤더·하단 버튼 등) 아래에 깔림
+  const points = [[0.5, 0.5], [0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9]]
+    .map(([fx, fy]) => [r.left + r.width * fx, r.top + r.height * fy])
+    .filter(([x, y]) => x >= 0 && y >= 0 && x < innerWidth && y < innerHeight);
+  const coveredAt = ([x, y]) => { const top = document.elementFromPoint(x, y); return !!top && !el.contains(top) && !top.contains(el) && !top.closest(ignore); };
   return {
     key: el.dataset.kwcagFocus,
     role,
     name,
     html: el.outerHTML.slice(0, 200),
-    hidden: (r.width === 0 && r.height === 0) || s.visibility === 'hidden' || Number(s.opacity) === 0 || !!el.closest('[aria-hidden="true"]'),
+    hidden,
     noIndicator: focused === unfocused,
+    obscured: !hidden && points.length > 0 && points.every(coveredAt),
+    stateAttr: ['aria-expanded', 'aria-pressed', 'aria-checked'].find((a) => el.hasAttribute(a)) ?? null,
   };
 })`;
 
@@ -147,6 +155,42 @@ const POINTER_ONLY_FN = `((ignore) => {
 
 function pseudoRule(id, help, nodes) {
   return { id, impact: 'serious', help, helpUrl: '', nodes: nodes.map(({ target, html, summary }) => ({ target: [target], html, failureSummary: `Fix:\n${summary}` })) };
+}
+
+// 상태 속성(aria-expanded·aria-pressed·aria-checked)이 있는 컨트롤을 Enter로 눌러 본다.
+// 로그인 없는 새 브라우저 컨텍스트에서 돌기 때문에 서버 상태를 바꾸는 동작은 보통 로그인 요구에서 멈춘다.
+// 누른 뒤에는 다시 눌러 되돌리고, 열린 팝업은 Esc로 닫는다. 주소가 바뀌면 거기서 멈춘다.
+async function toggleChecks(page, order) {
+  const startUrl = page.url();
+  const results = [];
+  for (const o of order.filter((x) => x.stateAttr && !x.hidden)) {
+    // 앞선 토글을 되돌리며 다시 그려진 요소는 표시가 사라지므로, 같은 상태 속성·이름으로 다시 찾는다
+    const sel = `[data-kwcag-focus="${o.key}"]`;
+    const before = await page.evaluate(([s, a, key, name]) => {
+      const nameOf = (e) => (e.getAttribute('aria-label') || e.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+      const el = document.querySelector(s) ?? [...document.querySelectorAll(`[${a}]`)].find((e) => nameOf(e) === name);
+      if (!el) return null;
+      el.dataset.kwcagFocus = key;
+      el.focus();
+      return el.getAttribute(a);
+    }, [sel, o.stateAttr, o.key, o.name]);
+    if (before === null) continue;
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(200);
+    if (page.url() !== startUrl) break;
+    const after = await page.evaluate(([s, a]) => {
+      const el = document.querySelector(s);
+      const active = document.activeElement;
+      return { connected: !!el, state: el?.getAttribute(a) ?? null, focusLost: !active || active === document.body || active === document.documentElement };
+    }, [sel, o.stateAttr]);
+    results.push({ o, before, ...after });
+    if (after.connected && after.state !== before && !after.focusLost) {
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(200);
+    }
+    await page.keyboard.press('Escape');
+  }
+  return results;
 }
 
 async function keyboardPass(page, maxTabs) {
@@ -171,6 +215,7 @@ async function keyboardPass(page, maxTabs) {
   }
   const reachedLimit = !trap && order.length >= maxTabs;
   const pointerOnly = await page.evaluate(`${POINTER_ONLY_FN}(${JSON.stringify(FOCUS_IGNORE)})`);
+  const toggles = await toggleChecks(page, order);
   const label = (o) => `${o.role} "${o.name}"`;
 
   const violations = [];
@@ -209,7 +254,34 @@ async function keyboardPass(page, maxTabs) {
         pointerOnly.map((html) => ({ target: '(포인터 전용 요소)', html, summary: 'cursor:pointer인데 초점을 받을 수 없음 — 클릭 동작이 있다면 button·a로 바꾸기' })),
       ),
     );
-  return { order, trap: !!trap, reachedLimit, violations, incomplete };
+  const obscured = order.filter((o) => o.obscured);
+  if (obscured.length)
+    incomplete.push(
+      pseudoRule(
+        'kwcag-focus-obscured',
+        '초점을 받은 요소가 다른 요소에 완전히 가려집니다',
+        obscured.map((o) => ({ target: label(o), html: o.html, summary: '초점 시점에 가운데·네 귀퉁이가 모두 고정 헤더·하단 버튼 등에 덮임 (WCAG 2.4.11) — scroll-margin·여백 확인' })),
+      ),
+    );
+  const lost = toggles.filter((t) => t.focusLost);
+  if (lost.length)
+    violations.push(
+      pseudoRule(
+        'kwcag-focus-lost',
+        '키보드로 조작한 뒤 초점을 잃습니다',
+        lost.map((t) => ({ target: label(t.o), html: t.o.html, summary: 'Enter를 누른 뒤 초점이 문서 처음(body)으로 돌아감 — 사라지는 버튼이면 다음 요소나 새로 나타난 내용으로 초점 옮기기' })),
+      ),
+    );
+  const stale = toggles.filter((t) => t.connected && !t.focusLost && t.state === t.before);
+  if (stale.length)
+    incomplete.push(
+      pseudoRule(
+        'kwcag-state-not-updated',
+        '키보드로 눌러도 상태 속성이 바뀌지 않습니다',
+        stale.map((t) => ({ target: label(t.o), html: t.o.html, summary: `Enter를 눌러도 ${t.o.stateAttr}="${t.before}" 그대로 — 키보드로 동작하지 않거나 상태를 갱신하지 않음 (로그인 요구로 멈춘 경우일 수 있음)` })),
+      ),
+    );
+  return { order, trap: !!trap, reachedLimit, toggled: toggles.length, violations, incomplete };
 }
 
 function experimentalRules(enabled) {
@@ -408,12 +480,12 @@ function render(results, opts) {
 
 function renderFocusOrder(lines, kb) {
   const end = kb.trap ? '키보드 함정 의심으로 중단' : kb.reachedLimit ? 'Tab 횟수 한도에 도달 (--tabs로 늘리기)' : '끝까지 순회';
-  lines.push(`### 키보드 초점 순서 (${kb.order.length}개 · ${end})`);
+  lines.push(`### 키보드 초점 순서 (${kb.order.length}개 · ${end} · Enter 조작 확인 ${kb.toggled}개)`);
   lines.push('');
-  lines.push('화면에 보이는 순서와 맞는지 사람이 확인하세요 (1.3.2, 2.1.2). ⚠ 숨김 = 보이지 않는 요소, ○ 표시 없음 = 초점 전후 모양이 같음.');
+  lines.push('화면에 보이는 순서와 맞는지 사람이 확인하세요 (1.3.2, 2.1.2). ⚠ 숨김 = 보이지 않는 요소, ○ 표시 없음 = 초점 전후 모양이 같음, ▣ 가림 = 다른 요소에 덮임, ⇄ = Enter로 눌러 본 상태 컨트롤.');
   lines.push('');
   kb.order.forEach((o, i) => {
-    const flags = [o.hidden && '⚠ 숨김', !o.hidden && o.noIndicator && '○ 표시 없음'].filter(Boolean).join(' ');
+    const flags = [o.hidden && '⚠ 숨김', !o.hidden && o.noIndicator && '○ 표시 없음', o.obscured && '▣ 가림', o.stateAttr && !o.hidden && `⇄ ${o.stateAttr}`].filter(Boolean).join(' ');
     lines.push(`${i + 1}. ${o.role} "${o.name || '(이름 없음)'}"${flags ? ` — ${flags}` : ''}`);
   });
   lines.push('');

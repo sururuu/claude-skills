@@ -288,6 +288,15 @@
     },
     "kwcag-pointer-only": {
       "item": "2.1.1"
+    },
+    "kwcag-focus-obscured": {
+      "item": "2.1.2"
+    },
+    "kwcag-focus-lost": {
+      "item": "2.1.2"
+    },
+    "kwcag-state-not-updated": {
+      "item": "4.2.1"
     }
   }
 }

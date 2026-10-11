@@ -17,6 +17,15 @@
 		<div style="cursor: pointer" onclick="void 0">div 클릭</div>
 		<!-- 2.1.2 위반(kwcag-focus-hidden): 투명하지만 초점을 받음 -->
 		<button style="opacity: 0">투명 버튼</button>
+		<!-- 정상: Enter로 aria-expanded가 바뀜 -->
+		<button aria-expanded="false" onclick="this.setAttribute('aria-expanded', String(this.getAttribute('aria-expanded') !== 'true'))">정상 토글</button>
+		<!-- 4.2.1 검토 필요(kwcag-state-not-updated): 눌러도 aria-expanded 그대로 -->
+		<button aria-expanded="false" onclick="void 0">상태 안 바뀜</button>
+		<!-- 2.1.2 위반(kwcag-focus-lost): 누르면 자기 자신이 사라져 초점을 잃음 -->
+		<button aria-pressed="false" onclick="this.remove()">사라지는 토글</button>
+		<!-- 2.1.2 검토 필요(kwcag-focus-obscured): 하단 고정 바에 완전히 덮임 -->
+		<button style="position: fixed; bottom: 20px; left: 20px; z-index: 1">가려진 버튼</button>
+		<div style="position: fixed; bottom: 0; left: 0; right: 0; height: 80px; background: #222; z-index: 2"></div>
 		<!-- 2.1.1 위반(kwcag-focus-trap): 함정2에서 Tab을 누르면 함정1로 되돌아감 -->
 		<button id="t1">함정1</button>
 		<button id="t2">함정2</button>

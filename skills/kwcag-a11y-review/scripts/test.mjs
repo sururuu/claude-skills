@@ -67,4 +67,13 @@ const pointer = find('2.1.1', 'incomplete', 'kwcag-pointer-only');
 assert.equal(pointer?.nodes.length, 1, '포인터 전용 div 하나가 보고돼야 함');
 assert.match(pointer.nodes[0].html, /div 클릭/);
 
-console.log('ok — 키보드 확인 기대 결과 4건 모두 확인');
+const obscured = find('2.1.2', 'incomplete', 'kwcag-focus-obscured');
+assert.deepEqual(names(obscured), ['button "가려진 버튼"'], '하단 바에 덮인 버튼만 가림으로 보고돼야 함');
+
+const lost = find('2.1.2', 'violations', 'kwcag-focus-lost');
+assert.deepEqual(names(lost), ['button "사라지는 토글"'], '사라지는 토글만 초점 잃음으로 보고돼야 함');
+
+const stale = find('4.2.1', 'incomplete', 'kwcag-state-not-updated');
+assert.deepEqual(names(stale), ['button "상태 안 바뀜"'], '상태가 안 바뀌는 토글만 보고돼야 함 (정상 토글 제외)');
+
+console.log('ok — 키보드 확인 기대 결과 7건 모두 확인');
