@@ -1,0 +1,281 @@
+{
+  "_note": "axe-core 규칙 ID를 KWCAG 2.2 검사항목으로 묶기 위한 참고용 대응표. ref=true는 직접 대응이 아니라 관련 항목이라는 뜻. 여기 없는 aria-* 규칙은 4.2.1로 묶는다.",
+  "items": {
+    "1.1.1": "적절한 대체 텍스트 제공",
+    "1.2.1": "자막 제공",
+    "1.3.1": "표의 구성",
+    "1.3.2": "콘텐츠의 선형구조",
+    "1.3.3": "명확한 지시사항 제공",
+    "1.4.1": "색에 무관한 콘텐츠 인식",
+    "1.4.2": "자동 재생 금지",
+    "1.4.3": "텍스트 콘텐츠의 명도 대비",
+    "1.4.4": "콘텐츠 간의 구분",
+    "2.1.1": "키보드 사용 보장",
+    "2.1.2": "초점 이동과 표시",
+    "2.1.3": "조작 가능",
+    "2.1.4": "문자 단축키",
+    "2.2.1": "응답시간 조절",
+    "2.2.2": "정지 기능 제공",
+    "2.3.1": "깜빡임과 번쩍임 사용 제한",
+    "2.4.1": "반복 영역 건너뛰기",
+    "2.4.2": "제목 제공",
+    "2.4.3": "적절한 링크 텍스트",
+    "2.4.4": "고정된 참조 위치 정보",
+    "2.5.1": "단일 포인터 입력 지원",
+    "2.5.2": "포인터 입력 취소",
+    "2.5.3": "레이블과 네임",
+    "2.5.4": "동작기반 작동",
+    "3.1.1": "기본 언어 표시",
+    "3.2.1": "사용자 요구에 따른 실행",
+    "3.2.2": "찾기 쉬운 도움 정보",
+    "3.3.1": "오류 정정",
+    "3.3.2": "레이블 제공",
+    "3.3.3": "접근 가능한 인증",
+    "3.3.4": "반복 입력 정보",
+    "4.1.1": "마크업 오류 방지",
+    "4.2.1": "웹 애플리케이션 접근성 준수"
+  },
+  "rules": {
+    "image-alt": {
+      "item": "1.1.1"
+    },
+    "input-image-alt": {
+      "item": "1.1.1"
+    },
+    "area-alt": {
+      "item": "1.1.1"
+    },
+    "role-img-alt": {
+      "item": "1.1.1"
+    },
+    "svg-img-alt": {
+      "item": "1.1.1"
+    },
+    "object-alt": {
+      "item": "1.1.1"
+    },
+    "image-redundant-alt": {
+      "item": "1.1.1"
+    },
+    "video-caption": {
+      "item": "1.2.1"
+    },
+    "audio-caption": {
+      "item": "1.2.1"
+    },
+    "td-headers-attr": {
+      "item": "1.3.1"
+    },
+    "th-has-data-cells": {
+      "item": "1.3.1"
+    },
+    "td-has-header": {
+      "item": "1.3.1"
+    },
+    "scope-attr-valid": {
+      "item": "1.3.1"
+    },
+    "table-duplicate-name": {
+      "item": "1.3.1"
+    },
+    "table-fake-caption": {
+      "item": "1.3.1"
+    },
+    "empty-table-header": {
+      "item": "1.3.1"
+    },
+    "link-in-text-block": {
+      "item": "1.4.1"
+    },
+    "no-autoplay-audio": {
+      "item": "1.4.2"
+    },
+    "color-contrast": {
+      "item": "1.4.3"
+    },
+    "scrollable-region-focusable": {
+      "item": "2.1.1"
+    },
+    "frame-focusable-content": {
+      "item": "2.1.1"
+    },
+    "server-side-image-map": {
+      "item": "2.1.1"
+    },
+    "tabindex": {
+      "item": "2.1.2"
+    },
+    "focus-order-semantics": {
+      "item": "2.1.2"
+    },
+    "target-size": {
+      "item": "2.1.3",
+      "ref": true
+    },
+    "accesskeys": {
+      "item": "2.1.4",
+      "ref": true
+    },
+    "meta-refresh": {
+      "item": "2.2.1"
+    },
+    "meta-refresh-no-exceptions": {
+      "item": "2.2.1"
+    },
+    "marquee": {
+      "item": "2.2.2"
+    },
+    "blink": {
+      "item": "2.2.2"
+    },
+    "bypass": {
+      "item": "2.4.1"
+    },
+    "skip-link": {
+      "item": "2.4.1"
+    },
+    "region": {
+      "item": "2.4.1",
+      "ref": true
+    },
+    "landmark-one-main": {
+      "item": "2.4.1",
+      "ref": true
+    },
+    "landmark-unique": {
+      "item": "2.4.1",
+      "ref": true
+    },
+    "landmark-banner-is-top-level": {
+      "item": "2.4.1",
+      "ref": true
+    },
+    "landmark-complementary-is-top-level": {
+      "item": "2.4.1",
+      "ref": true
+    },
+    "landmark-contentinfo-is-top-level": {
+      "item": "2.4.1",
+      "ref": true
+    },
+    "landmark-main-is-top-level": {
+      "item": "2.4.1",
+      "ref": true
+    },
+    "landmark-no-duplicate-banner": {
+      "item": "2.4.1",
+      "ref": true
+    },
+    "landmark-no-duplicate-contentinfo": {
+      "item": "2.4.1",
+      "ref": true
+    },
+    "landmark-no-duplicate-main": {
+      "item": "2.4.1",
+      "ref": true
+    },
+    "document-title": {
+      "item": "2.4.2"
+    },
+    "frame-title": {
+      "item": "2.4.2"
+    },
+    "frame-title-unique": {
+      "item": "2.4.2"
+    },
+    "page-has-heading-one": {
+      "item": "2.4.2"
+    },
+    "empty-heading": {
+      "item": "2.4.2"
+    },
+    "heading-order": {
+      "item": "2.4.2"
+    },
+    "p-as-heading": {
+      "item": "2.4.2",
+      "ref": true
+    },
+    "link-name": {
+      "item": "2.4.3"
+    },
+    "identical-links-same-purpose": {
+      "item": "2.4.3"
+    },
+    "label-content-name-mismatch": {
+      "item": "2.5.3"
+    },
+    "html-has-lang": {
+      "item": "3.1.1"
+    },
+    "html-lang-valid": {
+      "item": "3.1.1"
+    },
+    "html-xml-lang-mismatch": {
+      "item": "3.1.1"
+    },
+    "valid-lang": {
+      "item": "3.1.1",
+      "ref": true
+    },
+    "label": {
+      "item": "3.3.2"
+    },
+    "select-name": {
+      "item": "3.3.2"
+    },
+    "form-field-multiple-labels": {
+      "item": "3.3.2"
+    },
+    "label-title-only": {
+      "item": "3.3.2"
+    },
+    "autocomplete-valid": {
+      "item": "3.3.4",
+      "ref": true
+    },
+    "duplicate-id": {
+      "item": "4.1.1"
+    },
+    "duplicate-id-active": {
+      "item": "4.1.1"
+    },
+    "duplicate-id-aria": {
+      "item": "4.1.1"
+    },
+    "list": {
+      "item": "4.1.1",
+      "ref": true
+    },
+    "listitem": {
+      "item": "4.1.1",
+      "ref": true
+    },
+    "definition-list": {
+      "item": "4.1.1",
+      "ref": true
+    },
+    "dlitem": {
+      "item": "4.1.1",
+      "ref": true
+    },
+    "button-name": {
+      "item": "4.2.1"
+    },
+    "input-button-name": {
+      "item": "4.2.1"
+    },
+    "nested-interactive": {
+      "item": "4.2.1"
+    },
+    "presentation-role-conflict": {
+      "item": "4.2.1"
+    },
+    "summary-name": {
+      "item": "4.2.1"
+    },
+    "kwcag-duplicate-id": {
+      "item": "4.1.1"
+    }
+  }
+}

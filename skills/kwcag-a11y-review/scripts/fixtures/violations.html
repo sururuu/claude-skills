@@ -1,0 +1,23 @@
+<!doctype html>
+<!-- 스캔 스크립트 회귀 테스트용. 각 요소에 일부러 넣은 위반과 기대 KWCAG 항목을 주석으로 적는다. -->
+<html>
+<!-- 3.1.1: lang 없음 -->
+<head>
+	<!-- 2.4.2: title 없음 -->
+	<!-- 미분류(WCAG 전용): 확대 차단 -->
+	<meta name="viewport" content="width=device-width, user-scalable=no, maximum-scale=1" />
+</head>
+<body>
+	<main>
+		<!-- 1.1.1: alt 없음 -->
+		<img src="poster.png" />
+		<!-- 4.1.1: id 중복 (스크립트가 직접 센다) -->
+		<div id="dup">a</div>
+		<div id="dup">b</div>
+		<!-- 4.2.1: 이름 없는 버튼 -->
+		<button></button>
+		<!-- 3.3.2: 레이블 없는 입력 -->
+		<input type="text" />
+	</main>
+</body>
+</html>

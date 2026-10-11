@@ -1,0 +1,13 @@
+{
+  "name": "claude-skills",
+  "private": true,
+  "description": "sururuu의 Claude 스킬 모음 — 테스트 실행용 package.json (스킬 설치에는 필요 없음)",
+  "license": "MIT",
+  "scripts": {
+    "test": "node skills/kwcag-a11y-review/scripts/test.mjs"
+  },
+  "devDependencies": {
+    "axe-core": "^4.14.0",
+    "jsdom": "^30.1.2"
+  }
+}
